@@ -20,7 +20,7 @@ Base.@nospecializeinfer @fallback_iip_specialize function SciMLBase.ODEFunction{
         steady_state = false, checkbounds = false, sparsity = false, @nospecialize(analytic = nothing),
         simplify = false, cse = true, @nospecialize(initialization_data = nothing), expression = Val{false},
         check_compatibility = true, nlstep = false, nlstep_compile = true, nlstep_scc = false,
-        optimize = nothing, kwargs...
+        optimize = nothing, compiler_options = CompilerOptions(), kwargs...
     ) where {iip, spec}
     check_complete(sys, ODEFunction)
     check_compatibility && check_compatible_system(ODEFunction, sys)
@@ -28,7 +28,7 @@ Base.@nospecializeinfer @fallback_iip_specialize function SciMLBase.ODEFunction{
     f = generate_rhs(
         sys; expression, wrap_gfw = Val{true},
         eval_expression, eval_module, checkbounds = checkbounds, cse,
-        optimize, kwargs...
+        optimize, compiler_options, kwargs...
     )
 
     if spec === SciMLBase.FunctionWrapperSpecialize && iip
@@ -45,7 +45,8 @@ Base.@nospecializeinfer @fallback_iip_specialize function SciMLBase.ODEFunction{
     if tgrad
         _tgrad = generate_tgrad(
             sys; expression, wrap_gfw = Val{true},
-            simplify, cse, eval_expression, eval_module, checkbounds, optimize, kwargs...
+            simplify, cse, eval_expression, eval_module, checkbounds, optimize,
+            compiler_options, kwargs...
         )
     else
         _tgrad = nothing
@@ -55,7 +56,7 @@ Base.@nospecializeinfer @fallback_iip_specialize function SciMLBase.ODEFunction{
         _jac = generate_jacobian(
             sys; expression, wrap_gfw = Val{true},
             simplify, sparse, cse, eval_expression, eval_module, checkbounds, optimize,
-            kwargs...
+            compiler_options, kwargs...
         )
     else
         _jac = nothing
@@ -102,7 +103,10 @@ Base.@nospecializeinfer @fallback_iip_specialize function SciMLBase.ODEProblem{i
         sys::System, @nospecialize(op), tspan;
         @nospecialize(callback = nothing), check_length = true, eval_expression = false,
         expression = Val{false}, eval_module = @__MODULE__, check_compatibility = true,
-        _skip_events = false, kwargs...
+        _skip_events = false,
+        compiler_options = CompilerOptions(),
+        init_compiler_options = CompilerOptions(),
+        kwargs...
     ) where {iip, spec}
     check_complete(sys, ODEProblem)
     check_compatibility && check_compatible_system(ODEProblem, sys)
@@ -112,7 +116,8 @@ Base.@nospecializeinfer @fallback_iip_specialize function SciMLBase.ODEProblem{i
         p = process_SciMLProblem(
         ODEFunction{_iip, spec}, sys, op;
         t = tspan !== nothing ? tspan[1] : tspan, check_length, eval_expression,
-        eval_module, expression, check_compatibility, kwargs...
+        eval_module, expression, check_compatibility, compiler_options,
+        init_compiler_options, kwargs...
     )
 
     kwargs = process_kwargs(
