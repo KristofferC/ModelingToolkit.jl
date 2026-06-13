@@ -602,6 +602,26 @@ resolve_optimize_option(x) = x
 resolve_optimize_option(::Nothing) = nothing
 
 """
+    $(TYPEDSIGNATURES)
+
+`A \\ b`, but propagating non-finite values instead of throwing. Used as the
+operation for inline linear SCC solves in generated code: initialization
+reconstruction evaluates observed chains with NaN sentinels for
+not-yet-computed values, and the `chkfinite` check inside `lu` would turn
+those into an `ArgumentError` instead of letting them propagate.
+"""
+function nan_safe_ldiv(A::AbstractMatrix, b::AbstractVector)
+    all(isfinite, A) || return fill!(similar(b, float(eltype(b)), size(A, 2)), NaN)
+    return A \ b
+end
+
+# Symbolically, `nan_safe_ldiv` behaves exactly like `\`. Without these,
+# substitution rebuilds the term with symtype `Any` and shape `Unknown(-1)`.
+SU.promote_symtype(::typeof(nan_safe_ldiv), A::SU.TypeT, b::SU.TypeT) = SU.promote_symtype(\, A, b)
+SU.promote_shape(::typeof(nan_safe_ldiv), sha::SU.ShapeT, shb::SU.ShapeT) = SU.promote_shape(\, sha, shb)
+SU.scalarization_function(::typeof(nan_safe_ldiv)) = SU._scalarize_ldiv
+
+"""
     $(TYPEDEF)
 
 A wrapper around a generated in-place and out-of-place function. The type-parameter `P`
