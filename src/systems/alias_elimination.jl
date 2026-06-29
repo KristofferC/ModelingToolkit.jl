@@ -111,7 +111,7 @@ tied, one of the tied variables is chosen arbitrarily.
 """
 function pick_alias_target(
         fullvars::Vector{SymbolicT}, group_vars::Vector{Int}, state_priorities, irreducibles::AtomicSetT,
-        graph = nothing
+        graph = nothing, canonical_ranks = nothing
     )
     irr_idx = findfirst(
         Base.Fix1(contains_possibly_indexed_element, irreducibles) ∘ Base.Fix1(getindex, fullvars),
@@ -129,7 +129,8 @@ function pick_alias_target(
             candidates = filter(v -> length(𝑑neighbors(graph, v)) == max_degree, candidates)
         end
     end
-    return candidates[1]
+    canonical_ranks === nothing && return candidates[1]
+    return argmin(Base.Fix1(getindex, canonical_ranks), candidates)
 end
 
 """
@@ -146,6 +147,8 @@ function find_perfect_aliases!(
     )
     (; sys, fullvars, structure) = state
     (; graph, solvable_graph, var_to_diff, state_priorities) = structure
+    canonical_ranks = StateSelection.has_canonical_ranks(structure) ?
+                      StateSelection.get_canonical_ranks(structure) : nothing
 
     diff_to_var = invview(var_to_diff)
     aliases = Dict{Int, Int}()
@@ -253,7 +256,7 @@ function find_perfect_aliases!(
         end
         # For consistent groups pick a target (survives as unknown) and rebase
         # parities relative to it via `target_p`.
-        target = pick_alias_target(fullvars, group_vars, state_priorities, irreducibles, graph)
+        target = pick_alias_target(fullvars, group_vars, state_priorities, irreducibles, graph, canonical_ranks)
         group_target[root] = target
         target_p = parity[target]
         for v in group_vars
