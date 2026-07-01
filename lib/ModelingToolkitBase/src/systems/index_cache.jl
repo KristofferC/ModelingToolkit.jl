@@ -618,6 +618,14 @@ function reorder_parameters(sys::AbstractSystem; kwargs...)
 end
 
 function reorder_parameters(sys::AbstractSystem, ps; kwargs...)
+    # If `ps` is the default parameter vector, route to the cached 0-arg method.
+    if isempty(kwargs) && sys isa System && has_index_cache(sys) &&
+       get_index_cache(sys) !== nothing && ps isa AbstractVector
+        dflt = parameters(sys; initial_parameters = true)
+        if length(ps) == length(dflt) && all(i -> isequal(ps[i], dflt[i]), eachindex(ps))
+            return reorder_parameters(sys)
+        end
+    end
     if has_index_cache(sys) && get_index_cache(sys) !== nothing
         return reorder_parameters(get_index_cache(sys)::IndexCache, ps; kwargs...)
     elseif ps isa Tuple
