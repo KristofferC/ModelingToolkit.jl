@@ -561,16 +561,24 @@ function SciMLBase.SCCNonlinearProblem{iip}(
     # codegen (`generate_rhs`/`generate_update_A`/`generate_update_b`) reuses one result
     # instead of recomputing the full ~31k-parameter layout for each of the dozens of SCCs.
     if get_index_cache(sys) !== nothing
-        reorder_parameters(sys)  # prime the parent's reorder cache (once)
+        rp = reorder_parameters(sys)  # prime the parent's reorder cache (once)
         cached_reorder = check_mutable_cache(
             sys, MTKBase.ReorderedDefaultParameters, MTKBase.ReorderedDefaultParameters, nothing
         )
-        if cached_reorder isa MTKBase.ReorderedDefaultParameters
-            for subsys in decomposition.subsystems
+        # The parameter array decomposition (`ParameterArrayAssignments`) is likewise a pure
+        # function of the shared parameter layout. Compute it once (param-only) and propagate
+        # to every subsystem; `build_function_wrapper` decomposes each subsystem's small
+        # cachesym tail on top of it (see the `n_param_buffers` handling there).
+        param_paa = MTKBase.ParameterArrayAssignments(
+            MTKBase.compute_array_variable_buffer_idxs(rp)
+        )
+        for subsys in decomposition.subsystems
+            if cached_reorder isa MTKBase.ReorderedDefaultParameters
                 store_to_mutable_cache!(
                     subsys, MTKBase.ReorderedDefaultParameters, cached_reorder
                 )
             end
+            store_to_mutable_cache!(subsys, MTKBase.ParameterArrayAssignments, param_paa)
         end
     end
 
